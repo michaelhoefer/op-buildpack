@@ -142,10 +142,9 @@ if [ "$STAGE" == "" ]; then
 
 fi
 
-# Create a package is specied and it's not a review app
+# Create package is specified; not a review app
 if [ "$SFDX_CREATE_PACKAGE_VERSION" == "true" ] && [ ! "$STAGE" == "" ];
 then
-
   log "Auth to dev hub ..."
 
   # Authenticate to Dev Hub (for package creation)
@@ -200,7 +199,6 @@ sfdx force:apex:test:run -r tap -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error
 exit_status=\$?
 
 if [ "$delete_test_org" != "false" ]; then
-  # Delete test org; write output in TAP format
   echo "# \$(sfdx force:org:delete -p -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error)"
 fi
 
@@ -213,14 +211,12 @@ EOF
 
 fi
 
-# TODO: This should only get called when it's a review app (currently it's running for everything)
 # Review app clean-up
 # Set bin/ra-org-delete.sh as 'pr-predestroy' script in app.json
 raOrgDeleteScript=$BUILD_DIR/bin/ra-org-delete.sh
 if [ "$CI" == "" ]; then
   log "Creating $raOrgDeleteScript (reference as 'pr-predestroy' script in app.json) ..."
 
-  # TODO: figure out why we need to re-auth: place auth files elsewhere, eg CACHE_DIR?
   cat > $raOrgDeleteScript << EOF
 # Delete Review app org
 
@@ -231,14 +227,6 @@ then
   echo "$SFDX_DEV_HUB_AUTH_URL" > $devHubAuthFile
 fi
 sfdx force:auth:sfdxurl:store -f $devHubAuthFile -a huborg -d
-
-# Auth to scratch org
-if [ ! -f $scratchOrgAuthFile ];
-then
-  mkdir -p $BUILD_DIR/$vendorDir
-  echo "$scratchSfdxAuthUrl" > $scratchOrgAuthFile
-fi
-sfdx force:auth:sfdxurl:store -f $scratchOrgAuthFile -a $TARGET_SCRATCH_ORG_ALIAS
 
 echo "Deleting Review app org $TARGET_SCRATCH_ORG_ALIAS" ...
 sfdx force:org:delete -p -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error
