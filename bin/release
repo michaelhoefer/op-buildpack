@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Returns a YAML formatted hash with two keys:
+# - addons is a list of default addons to install.
+# - default_process_types is a hash of default Procfile entries.
+#
+# BUILD_DIR is the location of the app.
+#
+cat << EOF
+---
+addons: []
+default_process_types:
+EOF

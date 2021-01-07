@@ -1,0 +1,9 @@
+#!/bin/sh
+
+echo "op-buildpack"
+
+if [ -f $1/sfdx-project.json ]; then
+  exit 0
+else
+  exit 1
+fi
