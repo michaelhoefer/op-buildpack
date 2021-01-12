@@ -58,7 +58,7 @@ This buildpack requires the following to be present in the Salesforce app reposi
 
       ```
       "scripts": {
-        "pr-predestroy": "./bin/ra-org-delete.sh"
+        "pr-predestroy": "./bin/delete-org.sh"
       },
       ```
 

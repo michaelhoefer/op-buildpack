@@ -1,12 +1,16 @@
 #!/bin/bash
 #
-# Performs buildpack transformation.
+# Usage:
+# bin/compile BUILD_DIR CACHE_DIR ENV_DIR
 # - BUILD_DIR is the location of the app.
 # - CACHE_DIR is a location the buildpack can use to cache build artifacts between builds.
 # - ENV_DIR is a directory that contains a file for each of the application’s configuration variables.
 #
-# Usage:
-# bin/compile BUILD_DIR CACHE_DIR ENV_DIR
+# The compile script is executed both for review apps permanent apps as the result of a deploy.
+# Our STAGE config variable determines whether this is for a Review App or a 'real' app.
+#
+# The objective of compile is to create dependent scratch orgs and create additional
+# executable scripts required during the release phase.
 
 START_TIME=$SECONDS
 
@@ -45,40 +49,22 @@ debug "BP_DIR: $BP_DIR"
 setup_dirs "$BUILD_DIR"
 
 # CLI details
-SFDX_VERSION=$(sfdx version)
-debug "sfdx version: $SFDX_VERSION"
-SFDX_PLUGINS=$(sfdx plugins --core)
-debug "Plugins: $SFDX_PLUGINS"
+debug "SFDX version: $(sfdx version)"
+debug "Plugins: $(sfdx plugins --core)"
 
 # Log config
 debug "SFDX_DEV_HUB_AUTH_URL: $SFDX_DEV_HUB_AUTH_URL"
 debug "STAGE: $STAGE"
-debug "SFDX_AUTH_URL: $SFDX_AUTH_URL"
-debug "SFDX_BUILDPACK_DEBUG: $SFDX_BUILDPACK_DEBUG"
-debug "CI: $CI"
-debug "HEROKU_TEST_RUN_BRANCH: $HEROKU_TEST_RUN_BRANCH"
-debug "HEROKU_TEST_RUN_COMMIT_VERSION: $HEROKU_TEST_RUN_COMMIT_VERSION"
-debug "HEROKU_TEST_RUN_ID: $HEROKU_TEST_RUN_ID"
-debug "STACK: $STACK"
 debug "SOURCE_VERSION: $SOURCE_VERSION"
-debug "SFDX_INSTALL_PACKAGE_VERSION: $SFDX_INSTALL_PACKAGE_VERSION"
-debug "SFDX_CREATE_PACKAGE_VERSION: $SFDX_CREATE_PACKAGE_VERSION"
 debug "SFDX_PACKAGE_NAME: $SFDX_PACKAGE_NAME"
 
 # Set target org alias
-if [ "$CI" == "true" ]; then
-  # CI doesn't include HEROKU_APP_NAME or SOURCE_VERSION (if so, we'd name
-  # similiarly to RA), so set it to a default value
-  TARGET_SCRATCH_ORG_ALIAS="ci-$HEROKU_TEST_RUN_COMMIT_VERSION"
-  TARGET_SCRATCH_ORG_NAME="Pipeline CI: $HEROKU_TEST_RUN_BRANCH $HEROKU_TEST_RUN_ID"
-else
-  # HEROKU_APP_NAME available via required=true in app.json
-  APP_NAME=${HEROKU_APP_NAME:-$SOURCE_VERSION}
-  TARGET_SCRATCH_ORG_ALIAS="ra-$APP_NAME"
-  TARGET_SCRATCH_ORG_NAME="Pipeline Review App: $APP_NAME"
-fi
+# Use the HEROKU_APP_NAME config setting for the org alias and name.  If missing, default to
+# SOURCE_VERSION which is the commit SHA for git deployed builds
+TARGET_SCRATCH_ORG_ALIAS="ra-${HEROKU_APP_NAME:-$SOURCE_VERSION}"
+TARGET_SCRATCH_ORG_NAME="Pipeline Review App: ${HEROKU_APP_NAME:-$SOURCE_VERSION}"
 
-# Ensure w/in 80-chars
+# Truncate org name to 80-chars
 TARGET_SCRATCH_ORG_NAME=$(echo ${TARGET_SCRATCH_ORG_NAME:0:79})
 
 debug "TARGET_SCRATCH_ORG_ALIAS: $TARGET_SCRATCH_ORG_ALIAS"
@@ -99,30 +85,15 @@ cd $BUILD_DIR
 log "Parse sfdx.yml values ..."
 
 # Parse sfdx.yml file into env
-#BUG: not parsing arrays properly
 eval $(parse_yaml sfdx.yml)
-
 debug "scratch-org-def: $scratch_org_def"
-debug "assign-permset: $assign_permset"
-debug "permset-name: $permset_name"
-debug "run-apex-tests: $run_apex_tests"
-debug "delete-test-org: $delete_test_org"
-debug "delete-scratch-org: $delete_scratch_org"
-debug "show-scratch-org-url: $show_scratch_org_url"
-debug "open-path: $open_path"
-debug "data-plans: $data_plans"
 
 # Set path for Dev Hub auth file
 devHubAuthFile=$BUILD_DIR/$vendorDir/sfdxurl
 
-# Review App or CI
 if [ "$STAGE" == "" ]; then
-
-  log "Running as a REVIEW APP ..."
-
-  if [ ! "$CI" == "" ]; then
-    log "Running via CI ..."
-  fi
+  # Review App. Create the scratch org for validation.
+  log "Running in Review stage"
 
   # Authenticate to Dev Hub (for scratch org creation)
 
@@ -135,16 +106,13 @@ if [ "$STAGE" == "" ]; then
   scratchSfdxAuthUrl=$(sfdx force:org:display --verbose -u $TARGET_SCRATCH_ORG_ALIAS --json | jq -r .result.sfdxAuthUrl)
   debug "scratchSfdxAuthUrl: $scratchSfdxAuthUrl"
 
-  # Store creds in file reflecting the source version (if not running CI)
+  # Store credentials in file reflecting the source version
   scratchOrgAuthFile=$BUILD_DIR/$vendorDir/$TARGET_SCRATCH_ORG_ALIAS
   echo "$scratchSfdxAuthUrl" > $scratchOrgAuthFile
   debug "stored in file: $scratchOrgAuthFile"
 
-fi
-
-# Create package is specified; not a review app
-if [ "$SFDX_CREATE_PACKAGE_VERSION" == "true" ] && [ ! "$STAGE" == "" ];
-then
+elif [ "$STAGE" == "packaging" ] ; then
+  # Dedicated packaging app compile.  Create the package version!
   log "Auth to dev hub ..."
 
   # Authenticate to Dev Hub (for package creation)
@@ -177,48 +145,12 @@ then
 
 fi
 
-# Setup tests for Heroku CI
+# Create script to delete scratch org. Referenced as 'pr-predestroy' script in app.json
+orgDeleteScript=$BUILD_DIR/bin/delete-org.sh
+log "Creating $orgDeleteScript"
 
-testSetupScript=$BUILD_DIR/bin/test-setup.sh
-testRunScript=$BUILD_DIR/bin/test.sh
-if [ "$run_apex_tests" == "true" ];
-then
-
-  if [ ! -f $testSetupScript ]; then
-    log "Creating $testSetupScript ..."
-     echo "# Log testing org
-sfdx force:org:display -u $TARGET_SCRATCH_ORG_ALIAS" > $testSetupScript
-    chmod +x $testSetupScript
-    cat $testSetupScript
-  fi
-
-  if [ ! -f $testRunScript ]; then
-    log "Creating $testRunScript ..."
-    cat > $testRunScript << EOF
-sfdx force:apex:test:run -r tap -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error
-exit_status=\$?
-
-if [ "$delete_test_org" != "false" ]; then
-  echo "# \$(sfdx force:org:delete -p -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error)"
-fi
-
-exit \$exit_status
-EOF
-
-    chmod +x $testRunScript
-    cat $testRunScript
-  fi
-
-fi
-
-# Review app clean-up
-# Set bin/ra-org-delete.sh as 'pr-predestroy' script in app.json
-raOrgDeleteScript=$BUILD_DIR/bin/ra-org-delete.sh
-if [ "$CI" == "" ]; then
-  log "Creating $raOrgDeleteScript (reference as 'pr-predestroy' script in app.json) ..."
-
-  cat > $raOrgDeleteScript << EOF
-# Delete Review app org
+cat > $orgDeleteScript << EOF
+# Delete scratch org
 
 # Auth to Dev Hub
 if [ ! -f $devHubAuthFile ];
@@ -231,36 +163,23 @@ sfdx force:auth:sfdxurl:store -f $devHubAuthFile -a huborg -d
 echo "Deleting Review app org $TARGET_SCRATCH_ORG_ALIAS" ...
 sfdx force:org:delete -p -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error
 EOF
-
-  chmod +x $raOrgDeleteScript
-  cat $raOrgDeleteScript
-fi
+chmod +x $orgDeleteScript
 
 ### Procfile & Release Phase
 
-# if no Procfile, create one
+# if no Procfile, create one to invoke release.sh
 if [ ! -f $BUILD_DIR/Procfile ]; then
   log "Creating Procfile ..."
   echo "# Deploy source to production org.
 release: ./"$vendorDir"/release.sh \"$TARGET_SCRATCH_ORG_ALIAS\" \"$SFDX_PACKAGE_VERSION_ID\"" > $BUILD_DIR/Procfile
-
-  debug "Generated Procfile that will deploy source in release phase and redirect to open-path in web phase"
 fi
 
 # copy scripts needed for release phase
 log "Copying files for release phase ..."
-
-debug "release.sh to $BUILD_DIR/release.sh"
 cp $BP_DIR/lib/release.sh $BUILD_DIR/"$vendorDir"/
-debug "common.sh to $BUILD_DIR/"$vendorDir"/common.sh"
 cp $BP_DIR/lib/common.sh $BUILD_DIR/"$vendorDir"/
-debug "sfdx.sh to $BUILD_DIR/"$vendorDir"/sfdx.sh"
 cp $BP_DIR/lib/sfdx.sh $BUILD_DIR/"$vendorDir"/
-debug "stdlib.sh to $BUILD_DIR/"$vendorDir"/stdlib.sh"
 cp $BP_DIR/lib/stdlib.sh $BUILD_DIR/"$vendorDir"/
-
-# TODO: can we be smart and delete or replace .profile during the appropriate
-# stage so that the release phase is faster?
 
 header "DONE! Completed in $(($SECONDS - $START_TIME))s"
 exit 0
