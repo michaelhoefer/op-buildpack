@@ -84,7 +84,8 @@ eval $(parse_yaml sfdx.yml)
 # Display expected sfdx.yml vars
 debug "scratch-org-def: $scratch_org_def"
 debug "run-apex-tests: $run_apex_tests"
-debug "delete-test-org: $delete_test_org"
+debug "delete-scratch-org: $delete_scratch_org"
+
 
 # Set path for Dev Hub auth file
 devHubAuthFile=$BUILD_DIR/$vendorDir/sfdxurl
@@ -124,7 +125,7 @@ sfdx force:org:display -u $TARGET_SCRATCH_ORG_ALIAS" > $testSetupScript
 sfdx force:apex:test:run -r tap -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error
 exit_status=\$?
 
-if [ "$delete_test_org" != "false" ]; then
+if [ "$delete_scratch_org" != "false" ]; then
   echo "# \$(sfdx force:org:delete -p -u $TARGET_SCRATCH_ORG_ALIAS --loglevel=error)"
 fi
 
