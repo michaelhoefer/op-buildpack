@@ -22,7 +22,7 @@ ENV_DIR=${3:-}
 BP_DIR=$(cd $(dirname ${0:-}); cd ..; pwd)
 
 # set defaults for optional config vars
-: ${OP_BUILDPACK_DEBUG:="false"}
+: ${SFDX_BUILDPACK_DEBUG:="false"}
 
 ### Load additional functions
 source $BP_DIR/lib/common.sh

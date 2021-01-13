@@ -7,7 +7,6 @@
 # - ENV_DIR is a directory that contains a file for each of the application’s configuration variables.
 #
 # The compile script is executed both for review apps permanent apps as the result of a deploy.
-# Our STAGE config variable determines whether this is for a Review App or a 'real' app.
 #
 # The objective of compile is to create dependent scratch orgs and create additional
 # executable scripts required during the release phase.
@@ -26,7 +25,7 @@ ENV_DIR=${3:-}
 BP_DIR=$(cd $(dirname ${0:-}); cd ..; pwd)
 
 # set defaults for optional config vars
-: ${OP_BUILDPACK_DEBUG:="false"}
+: ${SFDX_BUILDPACK_DEBUG:="false"}
 
 ### Load additional functions
 source $BP_DIR/lib/common.sh
@@ -53,7 +52,6 @@ debug "SFDX version: $(sfdx version)"
 debug "Plugins: $(sfdx plugins --core)"
 
 # Log config
-debug "SFDX_DEV_HUB_AUTH_URL: $SFDX_DEV_HUB_AUTH_URL"
 debug "STAGE: $STAGE"
 debug "SOURCE_VERSION: $SOURCE_VERSION"
 debug "SFDX_PACKAGE_NAME: $SFDX_PACKAGE_NAME"
@@ -91,9 +89,9 @@ debug "scratch-org-def: $scratch_org_def"
 # Set path for Dev Hub auth file
 devHubAuthFile=$BUILD_DIR/$vendorDir/sfdxurl
 
-if [ "$STAGE" == "" ]; then
+if [ "$SFDX_CREATE_SCRATCH_ORG" == "" ]; then
   # Review App. Create the scratch org for validation.
-  log "Running in Review stage"
+  log "Building review app"
 
   # Authenticate to Dev Hub (for scratch org creation)
 
@@ -102,7 +100,7 @@ if [ "$STAGE" == "" ]; then
   # Create scratch org
   invokeCmd "sfdx force:org:create -s -f \"$scratch_org_def\" -a $TARGET_SCRATCH_ORG_ALIAS orgName=\"$TARGET_SCRATCH_ORG_NAME\""
 
-  # Store creds for scratch org
+  # Store credentials for scratch org
   scratchSfdxAuthUrl=$(sfdx force:org:display --verbose -u $TARGET_SCRATCH_ORG_ALIAS --json | jq -r .result.sfdxAuthUrl)
   debug "scratchSfdxAuthUrl: $scratchSfdxAuthUrl"
 
@@ -111,8 +109,8 @@ if [ "$STAGE" == "" ]; then
   echo "$scratchSfdxAuthUrl" > $scratchOrgAuthFile
   debug "stored in file: $scratchOrgAuthFile"
 
-elif [ "$STAGE" == "packaging" ] ; then
-  # Dedicated packaging app compile.  Create the package version!
+elif [ "SFDX_CREATE_PACKAGE_VERSION" == "true" ] ; then
+  # Create the package version
   log "Auth to dev hub ..."
 
   # Authenticate to Dev Hub (for package creation)
@@ -139,8 +137,8 @@ elif [ "$STAGE" == "packaging" ] ; then
   else
 
     log "Calling $pkgVersionCreateScript"
-    sh "$pkgVersionCreateScript" huborg "$STAGE"
-
+    source "$pkgVersionCreateScript" huborg
+    debug "SFDX_PACKAGE_VERSION_ID: $SFDX_PACKAGE_VERSION_ID"
   fi
 
 fi
@@ -167,7 +165,7 @@ chmod +x $orgDeleteScript
 
 ### Procfile & Release Phase
 
-# if no Procfile, create one to invoke release.sh
+# if no Procfile, create one to invoke release.sh (though package version id will be lost if existing Procfile is used.)
 if [ ! -f $BUILD_DIR/Procfile ]; then
   log "Creating Procfile ..."
   echo "# Deploy source to production org.

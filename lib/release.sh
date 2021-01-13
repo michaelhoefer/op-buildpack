@@ -27,10 +27,7 @@ setup_dirs "."
 
 log "Config vars ..."
 debug "SFDX_DEV_HUB_AUTH_URL: $SFDX_DEV_HUB_AUTH_URL"
-debug "STAGE: $STAGE"
-debug "SFDX_AUTH_URL: $SFDX_AUTH_URL"
 debug "SFDX_BUILDPACK_DEBUG: $SFDX_BUILDPACK_DEBUG"
-debug "CI: $CI"
 debug "HEROKU_TEST_RUN_BRANCH: $HEROKU_TEST_RUN_BRANCH"
 debug "HEROKU_TEST_RUN_COMMIT_VERSION: $HEROKU_TEST_RUN_COMMIT_VERSION"
 debug "HEROKU_TEST_RUN_ID: $HEROKU_TEST_RUN_ID"
@@ -54,31 +51,17 @@ eval $(parse_yaml sfdx.yml)
 debug "scratch-org-def: $scratch_org_def"
 debug "assign-permset: $assign_permset"
 debug "permset-name: $permset_name"
-debug "run-apex-tests: $run_apex_tests"
 debug "delete-test-org: $delete_test_org"
 debug "delete-scratch-org: $delete_scratch_org"
 debug "show_scratch_org_url: $show_scratch_org_url"
 debug "open-path: $open_path"
 debug "data-plans: $data_plans"
 
-# If review app or CI
-if [ "$STAGE" == "" ]; then
+if [ "$SFDX_SOURCE_PUSH" == "" ]; then
+  # Auth to scratch org, from file stored in vendor dir from prior compile
+  auth "$vendorDir/$TARGET_SCRATCH_ORG_ALIAS" "" s "$TARGET_SCRATCH_ORG_ALIAS"
 
-  log "Running as a REVIEW APP ..."
-  if [ ! "$CI" == "" ]; then
-    log "Running via CI ..."
-  fi
-
-  # Get sfdx auth url for scratch org
-  scratchSfdxAuthUrlFile=$vendorDir/$TARGET_SCRATCH_ORG_ALIAS
-  scratchSfdxAuthUrl=`cat $scratchSfdxAuthUrlFile`
-
-  debug "scratchSfdxAuthUrl: $scratchSfdxAuthUrl"
-
-  # Auth to scratch org
-  auth "$scratchSfdxAuthUrlFile" "" s "$TARGET_SCRATCH_ORG_ALIAS"
-
-  # Push source
+  log "Pushing source to scratch org ${TARGET_SCRATCH_ORG_ALIAS}..."
   invokeCmd "sfdx force:source:push -u $TARGET_SCRATCH_ORG_ALIAS"
 
   # Show scratch org URL
@@ -92,84 +75,32 @@ if [ "$STAGE" == "" ]; then
 
 fi
 
-# If Development, Staging, or Prod
-if [ ! "$STAGE" == "" ]; then
+if [ "$SFDX_PROMOTE_PACKAGE_VERSION" == "true" ]; then
+  # Auth to Dev Hub
+  auth "$vendorDir/sfdxurl" "$SFDX_DEV_HUB_AUTH_URL" d huborg
 
-  log "Detected $STAGE. Kicking off deployment ..."
+  log "Set package version as released ..."
+  invokeCmd "sfdx force:package:version:promote --package \"$SFDX_PACKAGE_VERSION_ID\" --noprompt"
+fi
 
-  auth "$vendorDir/sfdxurl" "$SFDX_AUTH_URL" s "$TARGET_SCRATCH_ORG_ALIAS"
+if [ "$SFDX_INSTALL_PACKAGE_VERSION" == "true" ]; then
+  # Auth to scratch org, from file stored in vendor dir from prior compile
+  auth "$vendorDir/$TARGET_SCRATCH_ORG_ALIAS" "" s "$TARGET_SCRATCH_ORG_ALIAS"
 
-  if [ "$SFDX_INSTALL_PACKAGE_VERSION" == "true" ]
-  then
-
-    # Auth to Dev Hub
-    auth "$vendorDir/sfdxurl" "$SFDX_DEV_HUB_AUTH_URL" d huborg
-
-    pkgVersionInstallScript=bin/package-install.sh
-    # run package install
-    if [ ! -f "$pkgVersionInstallScript" ];
-    then
-
-      # if target stage is production, release the package version
-      if [ "$STAGE" == "PROD" ]; then
-
-        log "Set package version as released ..."
-
-        invokeCmd "sfdx force:package:version:promote --package \"$SFDX_PACKAGE_VERSION_ID\" --noprompt"
-
-      fi
-
-      log "Installing package version $SFDX_PACKAGE_NAME ..."
-
-      invokeCmd "sfdx force:package:install --noprompt --package \"$SFDX_PACKAGE_VERSION_ID\" -u \"$TARGET_SCRATCH_ORG_ALIAS\" --wait 1000 --publishwait 1000"
-
-    else
-
-      # Auth to Dev Hub
-      auth "$vendorDir/sfdxurl" "$SFDX_DEV_HUB_AUTH_URL" d huborg
-
-      log "Calling $pkgVersionInstallScript"
-      sh "$pkgVersionInstallScript" "$TARGET_SCRATCH_ORG_ALIAS" "$STAGE"
-
-    fi
-
-    if [ "$SFDX_BUILDPACK_DEBUG" == "true" ] ; then
-      invokeCmd "sfdx force:package:installed:list -u \"$TARGET_SCRATCH_ORG_ALIAS\""
-    fi
+  pkgVersionInstallScript=bin/package-install.sh
+  if [ ! -f "$pkgVersionInstallScript" ]; then
+    log "Installing package version $SFDX_PACKAGE_NAME ..."
+    invokeCmd "sfdx force:package:install --noprompt --package \"$SFDX_PACKAGE_VERSION_ID\" -u \"$TARGET_SCRATCH_ORG_ALIAS\" --wait 1000 --publishwait 1000"
 
   else
 
-    log "Source convert and mdapi deploy"
-
-    mdapiDeployScript=bin/mdapi-deploy.sh
-    # run mdapi-deploy script
-    if [ ! -f "$mdapiDeployScript" ];
-    then
-
-      invokeCmd "sfdx force:source:convert -d mdapiout"
-      invokeCmd "sfdx force:mdapi:deploy -d mdapiout --wait 1000 -u $TARGET_SCRATCH_ORG_ALIAS"
-
-    else
-
-      log "Calling $mdapiDeployScript"
-      sh "$mdapiDeployScript" "$TARGET_SCRATCH_ORG_ALIAS" "$STAGE"
-
-    fi
+    log "Calling $pkgVersionInstallScript"
+    sh "$pkgVersionInstallScript" "$TARGET_SCRATCH_ORG_ALIAS" "$STAGE"
 
   fi
 
-  if [ "$run_apex_tests" == "true" ];
-  then
-
-    log "Running apex tests (this may take awhile) ..."
-
-    CMD="sfdx force:apex:test:run --resultformat human --codecoverage -u $TARGET_SCRATCH_ORG_ALIAS --wait 1000 --json | jq -r .result.summary.testRunId"
-    debug "CMD: $CMD"
-    SFDX_TEST_RUN_ID=$(eval $CMD)
-    debug "SFDX_TEST_RUN_ID: $SFDX_TEST_RUN_ID"
-
-    invokeCmd "sfdx force:apex:test:report --testrunid $SFDX_TEST_RUN_ID --resultformat human --codecoverage -u $TARGET_SCRATCH_ORG_ALIAS --wait 1000 --verbose"
-
+  if [ "$SFDX_BUILDPACK_DEBUG" == "true" ] ; then
+    invokeCmd "sfdx force:package:installed:list -u \"$TARGET_SCRATCH_ORG_ALIAS\""
   fi
 
 fi
