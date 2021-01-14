@@ -49,8 +49,6 @@ log "Parse sfdx.yml values ..."
 eval $(parse_yaml sfdx.yml)
 
 debug "scratch-org-def: $scratch_org_def"
-debug "assign-permset: $assign_permset"
-debug "permset-name: $permset_name"
 debug "show_scratch_org_url: $show_scratch_org_url"
 debug "open-path: $open_path"
 debug "data-plans: $data_plans"

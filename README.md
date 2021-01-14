@@ -70,14 +70,10 @@ This One Pipeline buildpack requires the following to be present in the Salesfor
 
     ```
     scratch-org-def: config/project-scratch-def.json
-    assign-permset: false
-    permset-name:
     run-apex-tests: true
     apex-test-format: tap
     show-scratch-org-url: false
     open-path: /one/one.app#/setup/home
-    import-data: false
-    data-plans:
     ```
 
 3. **sfdx-project.json**: If you are using Unlocked Packages, which is the default behavior, you'll need to ensure the required packaging data is in your `sfdx-project.json` file.
@@ -103,14 +99,12 @@ The buildpack uses config vars associated with each Heroku App to control the bu
 - `SFDX_DEV_HUB_AUTH_URL`: Provides the credentials for connecting to the Dev Hub. You can get this value by running `sfdx force:org:display --verbose --json` against your Dev Hub and grabbing the `sfdxAuthUrl`.
 
 ### For Staging
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/michaelhoefer/op-staging)
 
 - `SFDX_CREATE_PACKAGE_VERSION`: If true, instructs the buildpack to create a new package version from the source. 
-
 - `SFDX_PACKAGE_NAME`: Provides the full name of the package to create and install, used to derive the package id
 
-
 ### For Production
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/michaelhoefer/op-prod)
 
 - `SFDX_PROMOTE_PACKAGE_VERSION`: If true, instructs the build to promote the last built package version
-
-- `SFDX_DEV_HUB_AUTH_URL`: Provides the credentials for connecting to the Dev Hub. You can get this value by running `sfdx force:org:display --verbose --json` against your Dev Hub and grabbing the `sfdxAuthUrl`.

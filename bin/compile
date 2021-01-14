@@ -89,7 +89,7 @@ debug "scratch-org-def: $scratch_org_def"
 # Set path for Dev Hub auth file
 devHubAuthFile=$BUILD_DIR/$vendorDir/sfdxurl
 
-if [ "$SFDX_CREATE_SCRATCH_ORG" == "" ]; then
+if [ "$SFDX_CREATE_SCRATCH_ORG" == "true" ]; then
   # Review App. Create the scratch org for validation.
   log "Building review app"
 
