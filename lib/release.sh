@@ -51,9 +51,8 @@ eval $(parse_yaml sfdx.yml)
 debug "scratch-org-def: $scratch_org_def"
 debug "show_scratch_org_url: $show_scratch_org_url"
 debug "open-path: $open_path"
-debug "data-plans: $data_plans"
 
-if [ "$SFDX_SOURCE_PUSH" == "" ]; then
+if [ "$SFDX_SOURCE_PUSH" == "true" ]; then
   # Auth to scratch org, from file stored in vendor dir from prior compile
   auth "$vendorDir/$TARGET_SCRATCH_ORG_ALIAS" "" s "$TARGET_SCRATCH_ORG_ALIAS"
 
