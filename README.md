@@ -8,8 +8,6 @@ Review Apps are used to automatically push code for pull requests to scratch org
 Heroku CI is used to test your code and gate code promotion in your repository.
 Staging and Production apps in your pipeline automate creation and subsequent promotion of package versions.
 
-This buildpack depends upon [https://github.com/heroku/salesforce-cli-buildpack](https://github.com/heroku/salesforce-cli-buildpack) to download and setup the Salesforce CLI and jq.
-
 To get started, you need a few required configuration files in your Salesforce project, and a simple pipeline defined in your Heroku account, described below.
 
 ## Requirements
@@ -39,7 +37,7 @@ This One Pipeline buildpack requires the following to be present in the Salesfor
         "SFDX_BUILDPACK_DEBUG": {
           "required": false
         },
-        "HEROKU_APP_NAME" : {
+        "SFDX_SCRATCH_NAME" : {
           "required": false
         }
       },

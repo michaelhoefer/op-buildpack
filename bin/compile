@@ -45,11 +45,11 @@ debug "CACHE_DIR: $CACHE_DIR"
 debug "ENV_DIR: $ENV_DIR"
 debug "BP_DIR: $BP_DIR"
 
-setup_dirs "$BUILD_DIR"
+# Install CLI
+install_sfdx_cli "$BUILD_DIR"
+install_jq "$BUILD_DIR"
+setup_paths "$BUILD_DIR"
 
-# CLI details
-debug "SFDX version: $(sfdx version)"
-debug "Plugins: $(sfdx plugins --core)"
 
 # Log config
 debug "STAGE: $STAGE"
@@ -57,10 +57,10 @@ debug "SOURCE_VERSION: $SOURCE_VERSION"
 debug "SFDX_PACKAGE_NAME: $SFDX_PACKAGE_NAME"
 
 # Set target org alias
-# Use the HEROKU_APP_NAME config setting for the org alias and name.  If missing, default to
+# Use the SDFX_APP_NAME config setting for the org alias and name.  If missing, default to
 # SOURCE_VERSION which is the commit SHA for git deployed builds
-TARGET_SCRATCH_ORG_ALIAS="ra-${HEROKU_APP_NAME:-$SOURCE_VERSION}"
-TARGET_SCRATCH_ORG_NAME="Pipeline Review App: ${HEROKU_APP_NAME:-$SOURCE_VERSION}"
+TARGET_SCRATCH_ORG_ALIAS="ra-${SFDX_SCRATCH_NAME:-$SOURCE_VERSION}"
+TARGET_SCRATCH_ORG_NAME="Pipeline Review App: ${SFDX_SCRATCH_NAME:-$SOURCE_VERSION}"
 
 # Truncate org name to 80-chars
 TARGET_SCRATCH_ORG_NAME=$(echo ${TARGET_SCRATCH_ORG_NAME:0:79})

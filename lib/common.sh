@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-setup_dirs() {
-  local DIR="$1"
-  export PATH="$DIR/vendor/sfdx/cli/bin:$PATH"
-  export PATH="$DIR/vendor/sfdx/jq:$PATH"
-}
-
 export_env_dir() {
   whitelist_regex=${2:-$'^(SALESFORCE_|HEROKU_)'}
   blacklist_regex=${3:-'^(PATH|GIT_DIR|CPATH|CPPATH|LD_PRELOAD|LIBRARY_PATH)$'}

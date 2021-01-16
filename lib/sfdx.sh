@@ -7,34 +7,43 @@ invokeCmd() {
 
 # <DIR> <SFDX_AUTH_URL> <d|s> <alias>
 auth() {
-  
   SFDX_AUTH_URL_FILE="$1"
   if [ ! "$2" == "" ]; then
     echo "$2" > "$SFDX_AUTH_URL_FILE"
   fi
   invokeCmd "sfdx force:auth:sfdxurl:store -f $SFDX_AUTH_URL_FILE -$3 -a $4"
-
 }
 
-# <run_apex_tests> <apex_test_format> <alias>
-tests() {
+# <BUILD DIR>
+install_sfdx_cli() {
+  BUILD_DIR="$1"
+  log "Downloading Salesforce CLI tarball ..."
+  mkdir sfdx && curl --silent --location "https://developer.salesforce.com/media/salesforce-cli/sfdx-cli/channels/stable/sfdx-cli-linux-x64.tar.xz" | tar xJ -C sfdx --strip-components 1
 
-  if [ "$1" == "true" ]; then
-    invokeCmd "sfdx force:apex:test:run -r $2 -u $3"
-  fi
+  log "Copying Salesforce CLI binary ..."
 
+  rm -rf "$BUILD_DIR/vendor/sfdx"
+  mkdir -p "$BUILD_DIR/vendor/sfdx"
+  cp -r sfdx "$BUILD_DIR/vendor/sfdx/cli"
+  chmod -R 755  "$BUILD_DIR/vendor/sfdx/cli"
 }
 
-# <package_name>
-createPackage2Version() {
+# <BUILD DIR>
+install_jq() {
+  BUILD_DIR="$1"
 
-  packageName="$1"
-  
+  log "Downloading jq ..."
+  mkdir -p "$BUILD_DIR/vendor/sfdx/jq"
+  cd "$BUILD_DIR/vendor/sfdx/jq"
+  wget --quiet -O jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64
+  chmod +x jq
 }
 
-# <package_name>
-createPackage2Version() {
+setup_paths() {
+  local $BUILD_DIR="$1"
+  export PATH="$BUILD_DIR/vendor/sfdx/cli/bin:$PATH"
+  export PATH="$BUILD_DIR/vendor/sfdx/jq:$PATH"
 
-  packageName="$1"
-  
+  debug "SFDX version: $(sfdx version)"
+  debug "Plugins: $(sfdx plugins --core)"
 }

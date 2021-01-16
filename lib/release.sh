@@ -23,7 +23,7 @@ header "Running release.sh"
 # Setup local paths
 log "Setting up paths ..."
 
-setup_dirs "."
+setup_paths "."
 
 log "Config vars ..."
 debug "SFDX_DEV_HUB_AUTH_URL: $SFDX_DEV_HUB_AUTH_URL"
@@ -52,7 +52,7 @@ debug "scratch-org-def: $scratch_org_def"
 debug "show_scratch_org_url: $show_scratch_org_url"
 debug "open-path: $open_path"
 
-if [ "$SFDX_SOURCE_PUSH" == "true" ]; then
+if [ "$SFDX_PUSH_SOURCE" == "true" ]; then
   # Auth to scratch org, from file stored in vendor dir from prior compile
   auth "$vendorDir/$TARGET_SCRATCH_ORG_ALIAS" "" s "$TARGET_SCRATCH_ORG_ALIAS"
 

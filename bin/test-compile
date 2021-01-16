@@ -42,7 +42,7 @@ debug "CACHE_DIR: $CACHE_DIR"
 debug "ENV_DIR: $ENV_DIR"
 debug "BP_DIR: $BP_DIR"
 
-setup_dirs "$BUILD_DIR"
+setup_paths "$BUILD_DIR"
 
 # CLI details
 debug "SFDX version: $(sfdx version)"
