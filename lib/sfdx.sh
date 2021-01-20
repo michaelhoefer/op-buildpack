@@ -7,7 +7,7 @@ invokeCmd() {
 
 # <DIR> <SFDX_AUTH_URL> <d|s> <alias>
 auth() {
-  SFDX_AUTH_URL_FILE="$1"
+  local SFDX_AUTH_URL_FILE="$1"
   if [ ! "$2" == "" ]; then
     echo "$2" > "$SFDX_AUTH_URL_FILE"
   fi
@@ -16,7 +16,7 @@ auth() {
 
 # <BUILD DIR>
 install_sfdx_cli() {
-  BUILD_DIR="$1"
+  local BUILD_DIR="$1"
   log "Downloading Salesforce CLI tarball ..."
   mkdir sfdx && curl --silent --location "https://developer.salesforce.com/media/salesforce-cli/sfdx-cli/channels/stable/sfdx-cli-linux-x64.tar.xz" | tar xJ -C sfdx --strip-components 1
 
@@ -30,7 +30,7 @@ install_sfdx_cli() {
 
 # <BUILD DIR>
 install_jq() {
-  BUILD_DIR="$1"
+  local BUILD_DIR="$1"
 
   log "Downloading jq ..."
   mkdir -p "$BUILD_DIR/vendor/sfdx/jq"
@@ -40,7 +40,7 @@ install_jq() {
 }
 
 setup_paths() {
-  local $BUILD_DIR="$1"
+  local BUILD_DIR="$1"
   export PATH="$BUILD_DIR/vendor/sfdx/cli/bin:$PATH"
   export PATH="$BUILD_DIR/vendor/sfdx/jq:$PATH"
 
